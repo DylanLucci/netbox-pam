@@ -1,0 +1,16 @@
+{% extends 'base/layout.html' %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header"><h3>Sync JumpCloud Users</h3></div>
+  <div class="card-body">
+    <p>This will fetch users from JumpCloud and create or update matching contacts in NetBox.</p>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">
+        <i class="mdi mdi-sync"></i> Start Sync
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
