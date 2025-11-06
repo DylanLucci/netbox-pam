@@ -1,2 +1,1 @@
-from .devicegroups import *
-from .usergroups import *
+from .groups import *

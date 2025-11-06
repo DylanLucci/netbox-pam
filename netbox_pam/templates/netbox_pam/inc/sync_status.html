@@ -1,0 +1,9 @@
+<div class="alert alert-info">
+  <h5>Sync complete!</h5>
+  <p>{{ created_count }} created, {{ updated_count }} updated.</p>
+  <ul>
+    {% for line in status_lines %}
+      <li>{{ line }}</li>
+    {% endfor %}
+  </ul>
+</div>

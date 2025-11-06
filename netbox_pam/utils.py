@@ -1,5 +1,3 @@
-import json
-
 import requests
 from django.conf import settings
 
@@ -14,7 +12,7 @@ def fetch_jumpcloud_resource(endpoint, limit=0, skip=0):
         endpoint (str): API endpoint after `/api`, e.g. "systemusers" or "v2/usergroups"
         limit (int): Number of records per request
         skip (int): Number of records to skip (for pagination)
-    
+
     Returns:
         list: A list of resource dictionaries
     """
