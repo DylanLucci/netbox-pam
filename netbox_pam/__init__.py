@@ -12,6 +12,9 @@ class NetBoxJumpcloudSyncConfig(PluginConfig):
     author_email = 'dylan@sol1.com.au'
     base_url = 'pam'
     min_version = '4.3.0'
+    default_settings = {
+        'overwrite_existing_objects': False,
+    }
 
 
 config = NetBoxJumpcloudSyncConfig

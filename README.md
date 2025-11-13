@@ -34,8 +34,32 @@ PLUGINS = [
 ]
 
 PLUGINS_CONFIG = {
-    "netbox_pam": {
+    'netbox_pam': {
         'JC_API_KEY': '', # Paste your Jumpcloud API key between the quotes.
     }
 }
 ```
+
+### Settings
+
+If you want to override the defaults for the plugin, you can do so in `/opt/netbox/netbox/netbox/configuration.py`, or if you use netbox-docker, your `/configuration/plugins.py` file :
+
+```python
+PLUGINS = [
+    'netbox_pam'
+]
+
+PLUGINS_CONFIG = {
+    'netbox_pam': {
+        'JC_API_KEY': '',
+        # Example settings below, see "Available settings"
+        # in README.md for all possible settings
+        'overwrite_existing_objects': False,
+    }
+}
+```
+
+#### Available Settings
+| Setting | Default value | Description |
+|---------|---------------|-------------|
+| `overwrite_existing_objects` | `False`| When syncing an object from Jumpcloud, fields on existing NetBox objects will be overwritten. |

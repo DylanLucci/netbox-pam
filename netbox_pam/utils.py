@@ -1,8 +1,15 @@
 import requests
 from django.conf import settings
 
+from netbox.plugins import get_plugin_config
+
 JC_API_KEY = settings.PLUGINS_CONFIG['netbox_pam'].get('JC_API_KEY')
 HEADERS = {'x-api-key': JC_API_KEY}
+
+
+def get_plugin_setting(setting_name):
+    return get_plugin_config('netbox_pam', setting_name)
+
 
 def fetch_jumpcloud_resource(endpoint, limit=0, skip=0):
     """
@@ -30,26 +37,34 @@ def fetch_jumpcloud_resource(endpoint, limit=0, skip=0):
         print(f"Unexpected response format for {endpoint}: {data}")
         return []
 
+
 def fetch_jumpcloud_users(limit=0):
     return fetch_jumpcloud_resource('systemusers', limit)
+
 
 def fetch_jumpcloud_usergroups(limit=0):
     return fetch_jumpcloud_resource('v2/usergroups', limit)
 
+
 def fetch_jumpcloud_devices(limit=0):
     return fetch_jumpcloud_resource('systems', limit)
+
 
 def fetch_jumpcloud_devicegroups(limit=0):
     return fetch_jumpcloud_resource('v2/systemgroups', limit)
 
+
 def fetch_jumpcloud_usergroup_devicegroups(group_id, limit=0):
     return fetch_jumpcloud_resource(f'v2/usergroups/{group_id}/systemgroups', limit)
+
 
 def fetch_jumpcloud_user_memberships(user_id, limit=0):
     return fetch_jumpcloud_resource(f'v2/users/{user_id}/memberof', limit)
 
+
 def fetch_jumpcloud_devicegroup_memberships(group_id, limit=0):
     return fetch_jumpcloud_resource(f'v2/systemgroups/{group_id}/members', limit)
+
 
 def sync_object(model, lookup, field_map, custom_fields, name_field='name', link_func=None):
     """
@@ -67,23 +82,23 @@ def sync_object(model, lookup, field_map, custom_fields, name_field='name', link
         dict: {'message': str, 'created': int, 'updated': int}
     """
     obj, created = model.objects.get_or_create(**lookup, defaults=field_map)
-
     changed = False
-    if not created:
+
+    if created or not get_plugin_setting('overwrite_existing_objects'):
         for field, new_value in field_map.items():
             if getattr(obj, field) != new_value:
                 setattr(obj, field, new_value)
                 changed = True
 
-    cf_data = obj.custom_field_data or {}
-    for key, new_value in custom_fields.items():
-        if cf_data.get(key) != new_value:
-            cf_data[key] = new_value
-            changed = True
+        cf_data = obj.custom_field_data or {}
+        for key, new_value in custom_fields.items():
+            if cf_data.get(key) != new_value:
+                cf_data[key] = new_value
+                changed = True
 
-    if changed:
-        obj.custom_field_data = cf_data
-        obj.save()
+        if changed:
+            obj.custom_field_data = cf_data
+            obj.save()
 
     display_name = getattr(obj, name_field, str(obj))
     url = link_func(obj) if link_func else obj.get_absolute_url()
