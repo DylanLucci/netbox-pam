@@ -11,7 +11,7 @@ class NetBoxJumpcloudSyncConfig(PluginConfig):
     author = 'Dylan Lucci'
     author_email = 'dylan@sol1.com.au'
     base_url = 'pam'
-    min_version = '4.3.4'
+    min_version = '4.3.0'
 
 
 config = NetBoxJumpcloudSyncConfig

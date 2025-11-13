@@ -1,9 +1,15 @@
+<style>
+  .alert {
+    flex-direction: column;
+  }
+</style>
+
 <div class="alert alert-info">
-  <h5>Sync complete!</h5>
+  <h4>Sync complete!</h4>
   <p>{{ created_count }} created, {{ updated_count }} updated.</p>
   <ul>
     {% for line in status_lines %}
-      <li>{{ line }}</li>
+      <li>{{ line|safe }}</li>
     {% endfor %}
   </ul>
 </div>

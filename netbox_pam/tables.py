@@ -33,7 +33,7 @@ class DeviceGroupTable(NetBoxTable):
             'pk', 'id', 'name', 'description', 'devices', 'vms', 'comments', 'tags', 'actions', 'created',
             'last_updated',
         )
-        brief_fields = ('pk', 'name', 'devices', 'vms', 'tags')
+        default_columns = ('pk', 'name', 'devices', 'vms', 'tags')
 
 
 class UserGroupTable(NetBoxTable):
@@ -58,4 +58,4 @@ class UserGroupTable(NetBoxTable):
             'pk', 'id', 'name', 'description', 'contacts', 'devicegroups', 'comments', 'tags', 'actions', 'created',
             'last_updated',
         )
-        brief_fields = ('pk', 'name', 'contacts', 'devicegroups', 'tags')
+        default_columns = ('pk', 'name', 'contacts', 'devicegroups', 'tags')

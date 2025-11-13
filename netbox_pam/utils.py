@@ -42,5 +42,55 @@ def fetch_jumpcloud_devices(limit=0):
 def fetch_jumpcloud_devicegroups(limit=0):
     return fetch_jumpcloud_resource('v2/systemgroups', limit)
 
+def fetch_jumpcloud_usergroup_devicegroups(group_id, limit=0):
+    return fetch_jumpcloud_resource(f'v2/usergroups/{group_id}/systemgroups', limit)
+
 def fetch_jumpcloud_user_memberships(user_id, limit=0):
     return fetch_jumpcloud_resource(f'v2/users/{user_id}/memberof', limit)
+
+def fetch_jumpcloud_devicegroup_memberships(group_id, limit=0):
+    return fetch_jumpcloud_resource(f'v2/systemgroups/{group_id}/members', limit)
+
+def sync_object(model, lookup, field_map, custom_fields, name_field='name', link_func=None):
+    """
+    Generic object sync helper.
+
+    Args:
+        model: Django model class (e.g. Contact, DeviceGroup)
+        lookup: dict for get_or_create lookup (e.g. {'name': name})
+        field_map: dict of model fields to update (e.g. {'comments': 'desc'})
+        custom_fields: dict of custom field key/value pairs (e.g. {'pam_jc_id': id})
+        name_field: field to show in messages (defaults to 'name')
+        link_func: optional function returning URL for message links (defaults to obj.get_absolute_url)
+
+    Returns:
+        dict: {'message': str, 'created': int, 'updated': int}
+    """
+    obj, created = model.objects.get_or_create(**lookup, defaults=field_map)
+
+    changed = False
+    if not created:
+        for field, new_value in field_map.items():
+            if getattr(obj, field) != new_value:
+                setattr(obj, field, new_value)
+                changed = True
+
+    cf_data = obj.custom_field_data or {}
+    for key, new_value in custom_fields.items():
+        if cf_data.get(key) != new_value:
+            cf_data[key] = new_value
+            changed = True
+
+    if changed:
+        obj.custom_field_data = cf_data
+        obj.save()
+
+    display_name = getattr(obj, name_field, str(obj))
+    url = link_func(obj) if link_func else obj.get_absolute_url()
+    action = 'Created' if created else ('Updated' if changed else 'No changes for')
+
+    return {
+        'message': f'{action} {model._meta.verbose_name.lower()}: <a href=\"{url}\">{display_name}</a>',
+        'created': 1 if created else 0,
+        'updated': 1 if changed and not created else 0
+    }

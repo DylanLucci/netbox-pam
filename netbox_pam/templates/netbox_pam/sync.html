@@ -7,11 +7,29 @@
     <p>This will fetch users from JumpCloud and create or update matching contacts in NetBox.</p>
     <form id="sync-form" hx-post="{% url 'plugins:netbox_pam:jumpcloud_sync' %}" hx-target="#sync-status" hx-swap="innerHTML">
       {% csrf_token %}
-      <button type="submit" class="btn btn-primary">Start Sync</button>
+      <button id="sync-button" type="submit" class="btn btn-primary">Start Sync</button>
     </form>
     <div id="sync-status" class="mt-3">
       <!-- Progress / status updates will appear here -->
     </div>
   </div>
 </div>
+
+<script>
+  document.body.addEventListener('htmx:beforeRequest', function(evt) {
+    if (evt.target.id === 'sync-form') {
+      const btn = document.getElementById('sync-button');
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+    }
+  });
+
+  document.body.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.target.id === 'sync-form') {
+      const btn = document.getElementById('sync-button');
+      btn.disabled = false;
+      btn.textContent = 'Start Sync';
+    }
+  });
+</script>
 {% endblock %}
