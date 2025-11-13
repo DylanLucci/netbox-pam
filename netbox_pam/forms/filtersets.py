@@ -20,9 +20,9 @@ class DeviceGroupFilterForm(NetBoxModelFilterSetForm):
     model = DeviceGroup
     fieldsets = (
         FieldSet('q', 'filter_id', 'tag'),
-        FieldSet('device_id', 'vm_id', name=_('Attributes')),
+        FieldSet('device_id', 'vm_id', 'usergroup_id', name=_('Attributes')),
     )
-    selector_fields = ('filter_id', 'q', 'device_id', 'vm_id')
+    selector_fields = ('filter_id', 'q', 'device_id', 'vm_id', 'usergroup_id')
 
     name = forms.CharField(
         label=_('Name'),
@@ -36,6 +36,11 @@ class DeviceGroupFilterForm(NetBoxModelFilterSetForm):
     vm_id = DynamicModelMultipleChoiceField(
         queryset=VirtualMachine.objects.all(),
         label=_('Virtual Machine'),
+        required=False,
+    )
+    usergroup_id = DynamicModelMultipleChoiceField(
+        queryset=UserGroup.objects.all(),
+        label=_('User Group'),
         required=False,
     )
     tag = TagFilterField(model)

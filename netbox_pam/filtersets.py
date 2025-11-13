@@ -38,6 +38,17 @@ class DeviceGroupFilterSet(NetBoxModelFilterSet):
         to_field_name='name',
         label=_('Virtual Machine (name)'),
     )
+    usergroup_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='user_groups',
+        queryset=UserGroup.objects.all(),
+        label=_('User Group (ID)'),
+    )
+    usergroup = django_filters.ModelMultipleChoiceFilter(
+        field_name='user_groups__name',
+        queryset=UserGroup.objects.all(),
+        to_field_name='name',
+        label=_('User Group (name)'),
+    )
 
     class Meta:
         model = DeviceGroup
