@@ -38,8 +38,30 @@ def fetch_jumpcloud_resource(endpoint, limit=0, skip=0):
         return []
 
 
+def fetch_jumpcloud_resource_single(endpoint):
+    """
+    Generic single-resource fetcher that returns the JSON payload as-is.
+
+    Args:
+        endpoint (str): API endpoint after `/api`, e.g. "systemusers" or "v2/usergroups"
+
+    Returns:
+        JSON: The fetched object's JSON
+    """
+    url = f'https://console.jumpcloud.com/api/{endpoint}'
+    response = requests.get(url, headers=HEADERS)
+    response.raise_for_status()
+    return response.json()
+
+
 def fetch_jumpcloud_users(limit=0):
     return fetch_jumpcloud_resource('systemusers', limit)
+
+
+def fetch_jumpcloud_user(user_id):
+    user = fetch_jumpcloud_resource_single(f'systemusers/{user_id}')
+    print(user)
+    return user
 
 
 def fetch_jumpcloud_usergroups(limit=0):
@@ -58,8 +80,8 @@ def fetch_jumpcloud_usergroup_devicegroups(group_id, limit=0):
     return fetch_jumpcloud_resource(f'v2/usergroups/{group_id}/systemgroups', limit)
 
 
-def fetch_jumpcloud_user_memberships(user_id, limit=0):
-    return fetch_jumpcloud_resource(f'v2/users/{user_id}/memberof', limit)
+def fetch_jumpcloud_usergroup_memberships(group_id, limit=0):
+    return fetch_jumpcloud_resource(f'v2/usergroups/{group_id}/members', limit)
 
 
 def fetch_jumpcloud_devicegroup_memberships(group_id, limit=0):
@@ -84,7 +106,7 @@ def sync_object(model, lookup, field_map, custom_fields, name_field='name', link
     obj, created = model.objects.get_or_create(**lookup, defaults=field_map)
     changed = False
 
-    if created or not get_plugin_setting('overwrite_existing_objects'):
+    if created or get_plugin_setting('overwrite_existing_objects'):
         for field, new_value in field_map.items():
             if getattr(obj, field) != new_value:
                 setattr(obj, field, new_value)
@@ -105,6 +127,7 @@ def sync_object(model, lookup, field_map, custom_fields, name_field='name', link
     action = 'Created' if created else ('Updated' if changed else 'No changes for')
 
     return {
+        'instance': obj,
         'message': f'{action} {model._meta.verbose_name.lower()}: <a href=\"{url}\">{display_name}</a>',
         'created': 1 if created else 0,
         'updated': 1 if changed and not created else 0
