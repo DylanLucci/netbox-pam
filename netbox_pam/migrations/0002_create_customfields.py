@@ -26,6 +26,7 @@ def create_custom_fields(apps, schema_editor):
                 'tenancy.contact',
                 'netbox_pam.devicegroup',
                 'netbox_pam.usergroup',
+                'virtualization.virtualmachine',
             ],
             'ui_editable': False,
         },
