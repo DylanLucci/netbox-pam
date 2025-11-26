@@ -13,7 +13,8 @@ def create_custom_fields(apps, schema_editor):
             'group_name': 'NetBox PAM',
             'description': 'List of public SSH keys attached to this Contact',
             'object_types': ['tenancy.contact'],
-            'ui_editable': True,
+            'unique': False,
+            'ui_editable': 'yes',
         },
         {
             'name': 'pam_jc_id',
@@ -28,7 +29,8 @@ def create_custom_fields(apps, schema_editor):
                 'netbox_pam.usergroup',
                 'virtualization.virtualmachine',
             ],
-            'ui_editable': False,
+            'unique': True,
+            'ui_editable': 'no',
         },
     ]
 
@@ -40,6 +42,7 @@ def create_custom_fields(apps, schema_editor):
                 'label': field_def['label'],
                 'group_name': field_def['group_name'],
                 'description': field_def['description'],
+                'unique': field_def['unique'],
                 'ui_editable': field_def['ui_editable'],
             },
         )
