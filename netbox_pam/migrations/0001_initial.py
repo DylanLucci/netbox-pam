@@ -60,4 +60,12 @@ class Migration(migrations.Migration):
             },
             bases=(netbox.models.deletion.DeleteMixin, models.Model),
         ),
+        migrations.AddConstraint(
+            model_name='devicegroup',
+            constraint=models.UniqueConstraint(fields=('name',), name='netbox_pam_devicegroup_unique_name'),
+        ),
+        migrations.AddConstraint(
+            model_name='usergroup',
+            constraint=models.UniqueConstraint(fields=('name',), name='netbox_pam_usergroup_unique_name'),
+        ),
     ]

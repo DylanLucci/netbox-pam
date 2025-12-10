@@ -1,14 +1,18 @@
 import json
+import uuid
 
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
+from django.utils.timezone import now
 from django.views import View
 from virtualization.models import VirtualMachine
 
+from core.models import Job
 from dcim.models import Device
 from tenancy.models import Contact
 
+from ..jobs import *
 from ..models import DeviceGroup, UserGroup
 from ..utils import *
 
@@ -45,6 +49,14 @@ class JumpcloudSyncView(View):
         return render(request, self.template_name)
 
     def post(self, request):
+        job = Job.objects.create(
+            name='Jumpcloud Sync Job',
+            job_id=uuid.uuid4(),
+            user=request.user,
+            scheduled=now(),
+            interval=1440,
+        )
+        sync_job(job=job)
         status_lines = []
         created_count, updated_count = 0, 0
 
@@ -54,7 +66,6 @@ class JumpcloudSyncView(View):
             status_lines.append(result['message'])
             created_count += result['created']
             updated_count += result['updated']
-            pass
 
         # Sync Contacts
         for user in fetch_jumpcloud_users(limit=50):
