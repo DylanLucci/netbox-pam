@@ -132,3 +132,30 @@ def sync_object(model, lookup, field_map, custom_fields, name_field='name', link
         'created': 1 if created else 0,
         'updated': 1 if changed and not created else 0
     }
+
+
+def fetch_addresses(addresses):
+    address_lines = []
+    for addr in addresses:
+        if not any(addr.values()):
+            continue
+
+        parts = [
+            addr.get('type').capitalize(),
+            addr.get('streetAddress'),
+            addr.get('locality'),
+            addr.get('region'),
+            addr.get('postalCode'),
+            addr.get('country')
+        ]
+
+        line = ", ".join(filter(None, parts))
+        address_lines.append(line)
+
+    address = "\n".join(address_lines) if address_lines else ""
+    return address
+
+
+def fetch_phone_numbers(phone_numbers):
+    phone = next((pn.get('number') for pn in phone_numbers if pn.get('number')), "")
+    return phone

@@ -1,23 +1,220 @@
 from datetime import timedelta
 
+from django.utils import timezone
+from virtualization.models import VirtualMachine
+
 from core.choices import JobStatusChoices
 from core.models import Job
+from dcim.models import Device
+from netbox.jobs import JobRunner, system_job
+from tenancy.models import Contact
+
+from .models import DeviceGroup, UserGroup
+from .utils import (
+    fetch_addresses,
+    fetch_jumpcloud_devicegroup_memberships,
+    fetch_jumpcloud_devicegroups,
+    fetch_jumpcloud_devices,
+    fetch_jumpcloud_usergroup_devicegroups,
+    fetch_jumpcloud_usergroup_memberships,
+    fetch_jumpcloud_usergroups,
+    fetch_jumpcloud_users,
+    fetch_phone_numbers,
+    sync_object,
+)
 
 
-def sync_job(job: Job, *args, **kwargs):
-    try:
-        job.start()
-        print("Running sync job...")
-    except Exception as e:
-        job.terminate(status=JobStatusChoices.STATUS_ERRORED, error=str(e))
-    finally:
-        job.terminate()
-        if job.interval:
-            new_scheduled_time = job.scheduled + timedelta(minutes=job.interval)
-            job.enqueue(
-                sync_job,
-                name=job.name,
-                user=job.user,
-                schedule_at=new_scheduled_time,
-                interval=job.interval,
-            )
+@system_job(interval=5)
+class SyncJob(JobRunner):
+    class Meta:
+        name = "Jumpcloud Sync Job"
+
+    def run(self, *args, **kwargs):
+        status_lines = []
+        created_count, updated_count = 0, 0
+
+        # Set the job as started
+        self.job.started = timezone.now()
+        self.job.save(update_fields=['started'])
+
+        try:
+            # TODO: Sync Devices
+            for device in fetch_jumpcloud_devices(limit=50):
+                result = _sync_device(device)
+                status_lines.append(result['message'])
+                created_count += result['created']
+                updated_count += result['updated']
+
+            # Sync Contacts
+            for user in fetch_jumpcloud_users(limit=50):
+                result = _sync_contact(user)
+                status_lines.append(result['message'])
+                created_count += result['created']
+                updated_count += result['updated']
+
+            # Sync Device Groups
+            for devicegroup in fetch_jumpcloud_devicegroups(limit=50):
+                result = _sync_devicegroup(devicegroup)
+                status_lines.append(result['message'])
+                created_count += result['created']
+                updated_count += result['updated']
+
+            # Sync User Groups
+            for usergroup in fetch_jumpcloud_usergroups(limit=50):
+                result = _sync_usergroup(usergroup)
+                status_lines.append(result['message'])
+                created_count += result['created']
+                updated_count += result['updated']
+
+            self.logger.info(f"Sync completed: {created_count} created, {updated_count} updated")
+        except Exception as e:
+            self.logger.error(f"Sync failed: {e}")
+            raise
+        finally:
+            # Set the job as completed
+            self.job.completed = timezone.now()
+            self.job.save(update_fields=['completed'])
+
+        # Enqueue the next sync job
+        interval = 5
+        job = SyncJob.enqueue(interval=interval)
+        job.scheduled = job.created() + timedelta(minutes=interval)
+        job.save(update_fields=['scheduled'])
+
+        return {
+            'status_lines': status_lines,
+            'created_count': created_count,
+            'updated_count': updated_count,
+        }
+
+
+def _sync_device(device):
+    name = device.get('displayName')
+    if not name:
+        return {'message': 'Skipped unnamed virtual machine', 'created': 0, 'updated': 0}
+    jc_id = device.get('id')
+
+    lookup = {'custom_field_data__pam_jc_id': jc_id} if jc_id else {'name': name}
+    vm_field_map = {
+        'name': name,
+    }
+    custom_fields = {
+        'pam_jc_id': jc_id,
+    }
+    return sync_object(VirtualMachine, lookup, vm_field_map, custom_fields)
+
+
+def _sync_devicegroup(group):
+    name = group.get('name')
+    if not name:
+        return {'message': 'Skipped unnamed device group', 'created': 0, 'updated': 0}
+    jc_id = group.get('id')
+
+    lookup = {'custom_field_data__pam_jc_id': jc_id} if jc_id else {'name': name}
+    field_map = {
+        'name': name,
+        'comments': group.get('description'),
+    }
+    custom_fields = {
+        'pam_jc_id': jc_id,
+    }
+
+    result = sync_object(DeviceGroup, lookup, field_map, custom_fields)
+    devicegroup = result['instance']
+
+    old_vm_ids = set(devicegroup.vms.values_list('id', flat=True))
+
+    jc_vms = fetch_jumpcloud_devicegroup_memberships(jc_id)
+    remote_ids = [
+        m.get("to", {}).get("id")
+        for m in jc_vms
+        if m.get("to", {}).get("id")
+    ]
+
+    local_vms = VirtualMachine.objects.filter(
+        custom_field_data__pam_jc_id__in=remote_ids
+    )
+    devicegroup.vms.set(local_vms)
+
+    new_vm_ids = set(local_vms.values_list("id", flat=True))
+    if old_vm_ids != new_vm_ids:
+        result['updated'] = 1
+        result['message'] = (
+            f'Updated device group members: '
+            f'<a href="{devicegroup.get_absolute_url()}">{devicegroup.name}</a>'
+        )
+
+    return result
+
+
+def _sync_contact(user):
+    name = f"{user.get('firstname')} {user.get('lastname')}".strip()
+    email = user.get('email')
+    if not name and not email:
+        return {'message': 'Skipped user with no name or email', 'created': 0, 'updated': 0}
+    jc_id = user.get('id')
+
+    lookup = {'custom_field_data__pam_jc_id': jc_id} if jc_id else ({'email__iexact': email} if email else {'name': name})
+    field_map = {
+        'name': name,
+        'title': user.get('jobTitle'),
+        'phone': fetch_phone_numbers(user.get('phoneNumbers')),
+        'email': email,
+        'address': fetch_addresses(user.get('addresses')),
+        'description': user.get('description'),
+    }
+    custom_fields = {
+        'pam_jc_id': jc_id,
+        'pam_ssh_keys': user.get('ssh_keys'),
+    }
+
+    return sync_object(Contact, lookup, field_map, custom_fields)
+
+
+def _sync_usergroup(group):
+    name = group.get('name')
+    if not name:
+        return {'message': 'Skipped unnamed user group', 'created': 0, 'updated': 0}
+    jc_id = group.get('id')
+
+    lookup = {'custom_field_data__pam_jc_id': jc_id} if jc_id else {'name': name}
+    field_map = {
+        'name': name,
+        'comments': group.get('description'),
+    }
+    custom_fields = {
+        'pam_jc_id': jc_id,
+    }
+
+    result = sync_object(UserGroup, lookup, field_map, custom_fields)
+    usergroup = result['instance']
+
+    jc_devicegroups = fetch_jumpcloud_usergroup_devicegroups(jc_id)
+    local_dgs = DeviceGroup.objects.filter(
+        custom_field_data__pam_jc_id__in=[dg['id'] for dg in jc_devicegroups]
+    )
+    usergroup.devicegroups.set(local_dgs)
+
+    old_contact_ids = set(usergroup.contacts.values_list('id', flat=True))
+
+    jc_contacts = fetch_jumpcloud_usergroup_memberships(jc_id)
+    remote_ids = [
+        c.get('to', {}).get('id')
+        for c in jc_contacts
+        if c.get('to', {}).get('id')
+    ]
+
+    local_contacts = Contact.objects.filter(
+        custom_field_data__pam_jc_id__in=remote_ids
+    )
+    usergroup.contacts.set(local_contacts)
+
+    new_contact_ids = set(local_contacts.values_list('id', flat=True))
+    if old_contact_ids != new_contact_ids:
+        result['updated'] = 1
+        result['message'] = (
+            f'Updated user group members: '
+            f'<a href="{usergroup.get_absolute_url()}">{usergroup.name}</a>'
+        )
+
+    return result

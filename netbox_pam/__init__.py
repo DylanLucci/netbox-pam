@@ -16,5 +16,4 @@ class NetBoxJumpcloudSyncConfig(PluginConfig):
         'overwrite_existing_objects': False,
     }
 
-
 config = NetBoxJumpcloudSyncConfig
